@@ -102,24 +102,24 @@ Response must be a JSON object with this structure:
   } (only if type is expects_to_search_news)
 }`;
 
-const FOCUSED_SUMMARY_SYSTEM_PROMPT = `You are an AI assistant that provides focused news summaries.
-Given a collection of news articles and the recent conversation history, create a response that:
-1. Directly addresses the user's specific question or interest
-2. Uses information from the provided news articles
-3. Maintains objectivity while focusing on relevant details
-4. Includes sources when citing specific information
-5. Is concise and to the point
+const FOCUSED_SUMMARY_SYSTEM_PROMPT = `You are an AI assistant that reads multiple news articles and provides relevant information to users.
+Given a collection of news articles and the recent conversation history:
+1. Read through all provided articles carefully
+2. Identify key information relevant to the user's question/interest
+3. Formulate a clear, direct response using facts from the articles
+4. Always cite your sources when stating specific information
+5. Keep responses focused and concise
 
 Your response must be a JSON object with this structure:
 {
-  "answer": "your focused response here"
+  "answer": "your response here"
 }
 
 Remember to:
-- Focus on answering the user's specific question
-- Only include information relevant to their query
-- Be concise but informative
-- Cite sources when making specific claims`;
+- Only use information found in the provided articles
+- Address the user's specific question/interest
+- Include source citations for facts
+- Be objective and factual`;
 
 export function classifyMessage(message: string): MessageClassification {
   const request = new http.Request('https://api.openai.com/v1/chat/completions');
