@@ -203,7 +203,7 @@ export function getReply(threadId: string, userMessage: string): Message {
   const messages = getThreadMessages(threadId);
   
   // Classify the message
-  const classification = classifyMessage(userMessage);
+  const classification = classifyMessage(JSON.stringify(messages));
   
   let content: string = "";
   let sources: string[] = [];

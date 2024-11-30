@@ -70,14 +70,15 @@ export class OpenAIResponse {
 export class SummaryResponse {
   summary: string = "";
 }
-
 const CLASSIFICATION_SYSTEM_PROMPT = `
 For context: Today's date is ${new Date(Date.now()).toDateString()}.
 
 You are a message classifier that determines if a user's message requires news search or a general response.
-Classify each message into one of two types:
-1. expects_general_reply - when the message just needs a conversational response
-2. expects_to_search_news - when the message is asking about news or current events
+You will be provided with the entire chat history, but focus primarily on the most recent message to determine the user's current intent.
+
+Classify the conversation based on the latest message into one of two types:
+1. expects_general_reply - when the latest message just needs a conversational response
+2. expects_to_search_news - when the latest message is asking about news or current events
 
 Response must be a JSON object with this structure:
 {
@@ -89,6 +90,7 @@ Response must be a JSON object with this structure:
   } (only if type is expects_to_search_news)
 }
 
+Consider the context of the entire conversation, but prioritize the intent of the most recent message.
 Ensure the response is valid JSON and matches the exact structure above.`;
 
 const NEWS_SUMMARY_SYSTEM_PROMPT = `You are a news summarizer. Given a collection of news articles, create a concise, informative summary that:
