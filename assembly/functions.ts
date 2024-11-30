@@ -70,11 +70,23 @@ export class OpenAIResponse {
 export class SummaryResponse {
   summary: string = "";
 }
+
+@json
+export class ChatMessage {
+  role: string = "";
+  content: string = "";
+}
+
+@json
+export class FocusedSummaryResponse {
+  answer: string = "";
+}
+
 const CLASSIFICATION_SYSTEM_PROMPT = `
 For context: Today's date is ${new Date(Date.now()).toDateString()}.
 
 You are a message classifier that determines if a user's message requires news search or a general response.
-You will be provided with the entire chat history, but focus primarily on the most recent message to determine the user's current intent.
+You will be provided with the recent chat history. Focus on the user's latest message to determine their intent.
 
 Classify the conversation based on the latest message into one of two types:
 1. expects_general_reply - when the latest message just needs a conversational response
@@ -85,27 +97,29 @@ Response must be a JSON object with this structure:
   "type": "expects_general_reply" | "expects_to_search_news",
   "reply": string (only if type is expects_general_reply),
   "searchParams": {
-    "query": string (should just be keywords, not a full sentence as few words as possible),
+    "query": string (should just be keywords, not a full sentence, as few words as possible),
     "sortBy": "relevancy" | "popularity" | "publishedAt"
   } (only if type is expects_to_search_news)
-}
+}`;
 
-Consider the context of the entire conversation, but prioritize the intent of the most recent message.
-Ensure the response is valid JSON and matches the exact structure above.`;
-
-const NEWS_SUMMARY_SYSTEM_PROMPT = `You are a news summarizer. Given a collection of news articles, create a concise, informative summary that:
-1. Highlights the key points and common themes
-2. Maintains objectivity and factual accuracy
-3. Includes relevant dates and sources
-4. Is written in a clear, journalistic style
-5. Small 2 line intro and outro
-5. Use bullet points and short sentences to make them easier to read
+const FOCUSED_SUMMARY_SYSTEM_PROMPT = `You are an AI assistant that provides focused news summaries.
+Given a collection of news articles and the recent conversation history, create a response that:
+1. Directly addresses the user's specific question or interest
+2. Uses information from the provided news articles
+3. Maintains objectivity while focusing on relevant details
+4. Includes sources when citing specific information
+5. Is concise and to the point
 
 Your response must be a JSON object with this structure:
 {
-  "summary": "your summary text here"
+  "answer": "your focused response here"
 }
-`;
+
+Remember to:
+- Focus on answering the user's specific question
+- Only include information relevant to their query
+- Be concise but informative
+- Cite sources when making specific claims`;
 
 export function classifyMessage(message: string): MessageClassification {
   const request = new http.Request('https://api.openai.com/v1/chat/completions');
@@ -144,12 +158,19 @@ export function searchNews(query: string, sortBy: string): NewsAPIResponse {
   return JSON.parse<NewsAPIResponse>(response.text());
 }
 
-export function summarizeNews(articles: NewsArticle[]): string {
+export function createFocusedSummary(articles: NewsArticle[], recentMessages: ChatMessage[]): string {
   const request = new http.Request('https://api.openai.com/v1/chat/completions');
-  request.headers.append("Content-Type", "application/json");  
+  request.headers.append("Content-Type", "application/json");
+  
   const messages: OpenAIMessage[] = [
-    { role: "system", content: NEWS_SUMMARY_SYSTEM_PROMPT},
-    { role: "user", content: JSON.stringify(articles) }
+    { role: "system", content: FOCUSED_SUMMARY_SYSTEM_PROMPT },
+    { 
+      role: "user", 
+      content: JSON.stringify({
+        articles: articles,
+        conversation: recentMessages
+      })
+    }
   ];
   
   const requestBody = new OpenAIChatInput();
@@ -166,6 +187,6 @@ export function summarizeNews(articles: NewsArticle[]): string {
   }
   
   const openAIResponse = JSON.parse<OpenAIResponse>(response.text());
-  const summaryResponse = JSON.parse<SummaryResponse>(openAIResponse.choices[0].message.content);
-  return summaryResponse.summary;
+  const summaryResponse = JSON.parse<FocusedSummaryResponse>(openAIResponse.choices[0].message.content);
+  return summaryResponse.answer;
 } 

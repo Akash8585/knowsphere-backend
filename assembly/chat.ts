@@ -6,12 +6,13 @@ import { bytesToUUID } from "./utils";
 import { 
   classifyMessage, 
   searchNews, 
-  summarizeNews, 
+  createFocusedSummary, 
   NewsArticle, 
   NewsAPIResponse,
   OpenAIChatInput,
   OpenAIMessage,
-  OpenAIResponse
+  OpenAIResponse,
+  ChatMessage
 } from './functions';
 import { TitleResponse } from './models';
 const dbName = "db";
@@ -202,8 +203,18 @@ export function getReply(threadId: string, userMessage: string): Message {
   // Get thread history for context
   const messages = getThreadMessages(threadId);
   
-  // Classify the message
-  const classification = classifyMessage(JSON.stringify(messages));
+  // Convert the last 3 messages to ChatMessage format
+  const recentMessages: ChatMessage[] = [];
+  const startIdx = Math.max(0, messages.length - 3);
+  for (let i = startIdx; i < messages.length; i++) {
+    recentMessages.push({
+      role: messages[i].role,
+      content: messages[i].content
+    });
+  }
+  
+  // Classify the message using recent context
+  const classification = classifyMessage(JSON.stringify(recentMessages));
   
   let content: string = "";
   let sources: string[] = [];
@@ -218,6 +229,7 @@ export function getReply(threadId: string, userMessage: string): Message {
       classification.searchParams.sortBy
     );
     console.log(`News data: ${JSON.stringify(newsData)}`);
+    
     // Extract unique URLs from articles using a Set
     const uniqueSources = new Set<string>();
     const articles = newsData.articles;
@@ -226,12 +238,12 @@ export function getReply(threadId: string, userMessage: string): Message {
     }
     sources = uniqueSources.values();
     
-    // Summarize the news articles
-    content = summarizeNews(articles);
+    // Create focused summary using recent messages context
+    content = createFocusedSummary(articles, recentMessages);
   }
   
   // Save bot reply with sources
-   now = Date.now();
+  now = Date.now();
   const botMessageQuery = `
     INSERT INTO messages (thread_id, role, content, created_at, sources)
     VALUES ($1, $2, $3, $4, $5)
@@ -256,11 +268,10 @@ export function getReply(threadId: string, userMessage: string): Message {
     SET last_message_at = $1 
     WHERE id = $2
   `;
-  
   const updateThreadParams = new postgresql.Params();
   updateThreadParams.push(now);
   updateThreadParams.push(threadId);
-  postgresql.query<Thread>(dbName, updateThreadQuery, updateThreadParams);
+  postgresql.query(dbName, updateThreadQuery, updateThreadParams);
   
   return botMessage;
 }
